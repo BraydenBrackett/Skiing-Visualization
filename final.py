@@ -1,0 +1,212 @@
+#TODO:
+# Week 1:
+#  + Clean data
+#  + Begin creation of main project webpage/figure out how to display it in a better fashion that a python command script
+#  + Begin work on intro analysis
+# Week 2:
+#  + Complete intro and intro analysis
+#  + Create map with resorts
+# Week 3:
+#   Get sliders/dropdowns functioning and basic ranking table working
+#   Complete algorithm for calculating new ranking table
+#   Begin work on new ranking table
+# Week 4:
+#   Finish new ranking table
+# Week 5:
+#   Polish work and add any updates
+
+
+#Data Source: https://www.kaggle.com/datasets/ulrikthygepedersen/ski-resorts
+
+
+from bokeh.plotting import figure, show, output_file, curdoc
+from bokeh.transform import factor_cmap
+from bokeh.layouts import column, row
+from bokeh.models import ColumnDataSource, Div, Legend, LegendItem, Range1d, Slider, CheckboxGroup, MultiSelect
+from bokeh.palettes import BrBG6, Set1_5
+import pandas as pd
+import sys
+import numpy as np
+
+data = pd.read_csv(sys.argv[1], encoding='latin-1')
+
+colors = ['#55eb67', '#ffd439', '#19bbdc', '#c965ff', '#ff540a']
+
+width = '700px'
+
+style = {
+    'word-wrap': 'break-word',
+    'width': width,
+    'font-size': '15px'
+}
+
+#---------------------------------------------
+#           Graph 1 - avg prices
+#---------------------------------------------
+
+text = """Snowsports are a fantastic way to get outside and enjoy the beautiful winter weather. They're a great form of exercise, an enjoyable social activity, and
+ a fun way to enjoy all that nature has to offer. Whether it's skiing, snowboarding, or some other form of downhill winter activity, there's always something to do 
+ on the mountain. However, with ever increasing popularity in snow sports, combined with ever increasing corporatization of ski mountains, picking a hill that meets 
+ you and your family and friends' needs can be a challenging task - not to mention an expensive one.
+<br><br>
+From a high-level perspective, a day's worth of skiing can range from the price of sit down meal to over $100 - all this for a day ticket that just gets you on the 
+lifts, no food, equipment, or accommodation included. Below is the average lift ticket price (in USD) across ski hills spanning each continent for the 2022 season.
+
+ 
+ """
+div0 = Div(text=text, styles=style)
+
+
+avg = data.groupby("Continent")["Price"].mean().reset_index()
+
+source = ColumnDataSource(avg)
+
+p0 = figure(y_axis_label='Ticket Price (USD $)', x_range=avg['Continent'], height=350, toolbar_location=None, tools="")
+
+p0.vbar(x='Continent', top='Price', source=source, width=0.5, color=factor_cmap('Continent', palette=colors, factors=data['Continent'].unique()))
+
+p0.xgrid.grid_line_color = None
+p0.y_range.start = 0
+
+
+#---------------------------------------------
+#      Graph 2 - prices across terrian
+#---------------------------------------------
+
+text = """However, prices are often deceptive and further extrapolation is needed to understand which deals that give you the best bang for your buck. Afterall, just because you bought
+an expensive lift ticket doesn't guarantee that you're getting better conditions or terrain, than a cheaper one. For example, if we take a popular metric for judging ski hills,
+total vertical elevation (highest run to lowest run) we can begin to understand the general trends of pricing schemes relative to the offering of the given mountains, across the world."""
+div1 = Div(text=text, styles=style)
+
+data['height'] = data['Highest point'] - data['Lowest point']
+
+filtered2 = data[data['Price'] != 0]
+
+source = ColumnDataSource(filtered2)
+
+p1 = figure(x_axis_label="Price (USD $)", y_axis_label="Total Elevation (meters)", toolbar_location=None, tools="")
+scatter = p1.scatter(x='Price', y='height', source=source, size=8, alpha=0.7, color=factor_cmap('Continent', palette=colors, factors=data['Continent'].unique()))
+
+legend = Legend(items=[LegendItem(label=dict(field="Continent"), renderers=[scatter])])
+p1.add_layout(legend, 'right')
+
+#p.background_fill_color = '#181919'
+
+text = """Unsurprisingly, the North American resorts are substantially more expensive that all other continents. They also happen to have the most variability in ticket price. The
+European continent, with it's famed and historic ski resorts, interestingly has more terrain to offer at a substantially reduced price compared to the shorter North American Resorts.
+And while not as numerous, the South American and Asian resorts appear to offer cheaper deals than both the North American and European resorts, with a large amount of terrain provided for the low cost.
+<br>
+<br>
+<br>
+The purpose of this brief example was to highlight the variability in skiing around the world, while pointing out the differences in what these mountains might provide.
+Everyone has their own vision of a perfect day on the hill, and the following tools are provided to further analyze data statistics on ski resorts and their offerings. Ultimately, this allows for a data driven
+comparison across a wide range of whatever factors you deem to be the most important to you in your skiing experience - applied immediately to a vast selection of some of the many mountains the world has to offer."""
+div2 = Div(text=text, styles=style)
+
+#---------------------------------------------
+#              Sliders + List
+#---------------------------------------------
+og_data = data
+
+#value sliders
+price_slider = Slider(title="Min Edge Weight", start=0, end=1350, step=50, value=324)
+elevation_slider = Slider(title="Min Edge Weight", start=0, end=1350, step=50, value=324)
+totalRun_slider = Slider(title="Min Edge Weight", start=0, end=1350, step=50, value=324)
+longestRunLength_slider = Slider(title="Min Edge Weight", start=0, end=1350, step=50, value=324)
+snowCannonSlider = Slider(title="Min Edge Weight", start=0, end=1350, step=50, value=324)
+numberOfLifts_slider = Slider(title="Min Edge Weight", start=0, end=1350, step=50, value=324) #total lifts column
+
+country_select = MultiSelect(title="Select Countries:", height=300, options=['All'] + sorted(list(set(data['Country']))), value=['All'])
+
+#categorical sliders (must not have - don't care - must have)
+#TODO: have text explaining each of the numerical values here
+childFriendly_slider = Slider(title="Min Edge Weight", start=0, end=2, step=1, value=1)
+snowpark_slider = Slider(title="Min Edge Weight", start=0, end=2, step=1, value=1)
+nightskiing_slider = Slider(title="Min Edge Weight", start=0, end=2, step=1, value=1)
+summerskiing_slider = Slider(title="Min Edge Weight", start=0, end=2, step=1, value=1)
+
+
+#---------------------------------------------
+#               Stacked Bars
+#---------------------------------------------
+soruce = ColumnDataSource(data) # main source of data
+
+
+
+#---------------------------------------------
+#                   Map
+#---------------------------------------------
+
+# Code for Lat/Long conversion to Mercator: https://stackoverflow.com/questions/57178783/how-to-plot-latitude-and-longitude-in-bokeh
+data['Longitude'] = data['Longitude'] * (6378137 * np.pi/180.0)
+data['Latitude'] = np.log(np.tan((90 + data['Latitude']) * np.pi/360.0)) * 6378137
+
+TOOLS = "reset,pan,wheel_zoom,box_zoom,hover"
+
+x_range_min = data['Longitude'].min() - 1700000
+x_range_max = data['Longitude'].max() + 1700000
+y_range_min = data['Latitude'].min() - 2000000
+y_range_max = data['Latitude'].max() + 2000000
+
+p2 = figure(width=1200, height=600, x_range=Range1d(start=x_range_min + 100000, end=x_range_max - 100000, bounds=(x_range_min, x_range_max)), 
+            y_range=Range1d(start=y_range_min + 100000, end=y_range_max - 100000, bounds=(y_range_min, y_range_max)),
+           x_axis_type="mercator", y_axis_type="mercator", tools=TOOLS)
+p2.add_tile("CartoDB Positron", retina=True)
+
+p2.scatter(x='Longitude', y='Latitude', size=4, source=source, color='green', alpha=0.7, legend_label='Points')
+
+#---------------------------------------------
+#            Update + Handlers
+#---------------------------------------------
+
+# Update functions
+def update(attr, old, new):
+    print("eeeeeeeeeeeeeeeee")
+
+def update_selected_values(attr, old, new):
+    print(country_select.value)
+    if country_select.value == ['All']:
+        map_filter_data = data
+    else:
+        map_filter_data = data[data['Country'].isin(country_select.value)]
+    source.data = map_filter_data
+
+# Handlers
+for widget in [price_slider, elevation_slider]:
+    widget.on_change('value', update)
+
+country_select.on_change('value', update_selected_values)
+
+#---------------------------------------------
+#               Layout and style
+#---------------------------------------------
+
+layout = column(price_slider, div0, p0, div1, p1, div2, country_select, p2)        
+#column(row(), row())          
+
+#output_file("viz.html")
+#show(layout)
+
+curdoc().add_root(layout)
+
+
+
+
+#LEFTOVER CODE:
+
+#for countries
+#country_select = CheckboxGroup(labels=sorted(list(set(data['Country']))), active=[])
+
+#def checkbox_handler(active):
+    #print(f'Active checkboxes: {active}')
+
+#country_select.on_change('active', lambda attr, old, new: checkbox_handler(new))
+
+#other_items = ['Child Friendly', 'Snowpark', 'Europe', 'Asia', 'Oceania']
+#continent_select = CheckboxGroup(labels=continents, active=[])
+
+#def checkbox_handler(active):
+    #TODO: Add continent sorting here
+    #print(f'Active checkboxes: {active}')
+
+#continent_select.on_change('active', lambda attr, old, new: checkbox_handler(new))
