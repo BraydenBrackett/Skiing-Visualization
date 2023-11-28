@@ -8,7 +8,7 @@
 #  + Create map with resorts
 # Week 3:
 #   Get sliders/dropdowns functioning and basic ranking table working
-#   Complete algorithm for calculating new ranking table
+#  + Complete algorithm for calculating new ranking table
 #   Begin work on new ranking table
 # Week 4:
 #   Finish new ranking table
@@ -23,15 +23,18 @@ from bokeh.plotting import figure, show, output_file, curdoc
 from bokeh.transform import factor_cmap
 from bokeh.layouts import column, row
 from bokeh.models import ColumnDataSource, Div, Legend, LegendItem, Range1d, Slider, CheckboxGroup, MultiSelect
-from bokeh.palettes import BrBG6, Set1_5
+from bokeh.palettes import BrBG6, Set1_5, Spectral11
+from sklearn.preprocessing import MinMaxScaler
 import pandas as pd
 import sys
 import numpy as np
 
 data = pd.read_csv(sys.argv[1], encoding='latin-1')
 
-colors = ['#55eb67', '#ffd439', '#19bbdc', '#c965ff', '#ff540a']
+data['Height'] = data['Highest point'] - data['Lowest point']
+data = data[data['Price'] != 0]
 
+colors = ['#55eb67', '#ffd439', '#19bbdc', '#c965ff', '#ff540a']
 width = '700px'
 
 style = {
@@ -61,12 +64,12 @@ avg = data.groupby("Continent")["Price"].mean().reset_index()
 
 source = ColumnDataSource(avg)
 
-p0 = figure(y_axis_label='Ticket Price (USD $)', x_range=avg['Continent'], height=350, toolbar_location=None, tools="")
+basic_bar = figure(y_axis_label='Ticket Price (USD $)', x_range=avg['Continent'], height=350, toolbar_location=None, tools="")
 
-p0.vbar(x='Continent', top='Price', source=source, width=0.5, color=factor_cmap('Continent', palette=colors, factors=data['Continent'].unique()))
+basic_bar.vbar(x='Continent', top='Price', source=source, width=0.5, color=factor_cmap('Continent', palette=colors, factors=data['Continent'].unique()))
 
-p0.xgrid.grid_line_color = None
-p0.y_range.start = 0
+basic_bar.xgrid.grid_line_color = None
+basic_bar.y_range.start = 0
 
 
 #---------------------------------------------
@@ -78,17 +81,13 @@ an expensive lift ticket doesn't guarantee that you're getting better conditions
 total vertical elevation (highest run to lowest run) we can begin to understand the general trends of pricing schemes relative to the offering of the given mountains, across the world."""
 div1 = Div(text=text, styles=style)
 
-data['height'] = data['Highest point'] - data['Lowest point']
+source = ColumnDataSource(data)
 
-filtered2 = data[data['Price'] != 0]
-
-source = ColumnDataSource(filtered2)
-
-p1 = figure(x_axis_label="Price (USD $)", y_axis_label="Total Elevation (meters)", toolbar_location=None, tools="")
-scatter = p1.scatter(x='Price', y='height', source=source, size=8, alpha=0.7, color=factor_cmap('Continent', palette=colors, factors=data['Continent'].unique()))
+basic_scatter = figure(x_axis_label="Price (USD $)", y_axis_label="Total Elevation (meters)", toolbar_location=None, tools="")
+scatter = basic_scatter.scatter(x='Price', y='Height', source=source, size=8, alpha=0.7, color=factor_cmap('Continent', palette=colors, factors=data['Continent'].unique()))
 
 legend = Legend(items=[LegendItem(label=dict(field="Continent"), renderers=[scatter])])
-p1.add_layout(legend, 'right')
+basic_scatter.add_layout(legend, 'right')
 
 #p.background_fill_color = '#181919'
 
@@ -106,15 +105,16 @@ div2 = Div(text=text, styles=style)
 #---------------------------------------------
 #              Sliders + List
 #---------------------------------------------
-og_data = data
 
-#value sliders
-price_slider = Slider(title="Min Edge Weight", start=0, end=1350, step=50, value=324)
-elevation_slider = Slider(title="Min Edge Weight", start=0, end=1350, step=50, value=324)
-totalRun_slider = Slider(title="Min Edge Weight", start=0, end=1350, step=50, value=324)
-longestRunLength_slider = Slider(title="Min Edge Weight", start=0, end=1350, step=50, value=324)
-snowCannonSlider = Slider(title="Min Edge Weight", start=0, end=1350, step=50, value=324)
-numberOfLifts_slider = Slider(title="Min Edge Weight", start=0, end=1350, step=50, value=324) #total lifts column
+#value sliders - inverted
+price_slider = Slider(title="How important is affordability?", start=0, end=10, step=1, value=5)
+snowCannonSlider = Slider(title="How important is skiing on real snow?", start=0, end=1350, step=50, value=324)
+
+#value sliders - normal
+elevation_slider = Slider(title="How important is total vertical?", start=0, end=1350, step=50, value=324)
+totalRun_slider = Slider(title="How important is the number of runs?", start=0, end=1350, step=50, value=324)
+longestRunLength_slider = Slider(title="How important is run length?", start=0, end=1350, step=50, value=324)
+numberOfLifts_slider = Slider(title="How important is the number of lifts?", start=0, end=1350, step=50, value=324) #total lifts column
 
 country_select = MultiSelect(title="Select Countries:", height=300, options=['All'] + sorted(list(set(data['Country']))), value=['All'])
 
@@ -125,35 +125,53 @@ snowpark_slider = Slider(title="Min Edge Weight", start=0, end=2, step=1, value=
 nightskiing_slider = Slider(title="Min Edge Weight", start=0, end=2, step=1, value=1)
 summerskiing_slider = Slider(title="Min Edge Weight", start=0, end=2, step=1, value=1)
 
-
 #---------------------------------------------
-#               Stacked Bars
-#---------------------------------------------
-soruce = ColumnDataSource(data) # main source of data
-
-
-
-#---------------------------------------------
-#                   Map
+#        Data Formatting + Normalizing
 #---------------------------------------------
 
 # Code for Lat/Long conversion to Mercator: https://stackoverflow.com/questions/57178783/how-to-plot-latitude-and-longitude-in-bokeh
 data['Longitude'] = data['Longitude'] * (6378137 * np.pi/180.0)
 data['Latitude'] = np.log(np.tan((90 + data['Latitude']) * np.pi/360.0)) * 6378137
 
-TOOLS = "reset,pan,wheel_zoom,box_zoom,hover"
-
 x_range_min = data['Longitude'].min() - 1700000
 x_range_max = data['Longitude'].max() + 1700000
 y_range_min = data['Latitude'].min() - 2000000
 y_range_max = data['Latitude'].max() + 2000000
 
-p2 = figure(width=1200, height=600, x_range=Range1d(start=x_range_min + 100000, end=x_range_max - 100000, bounds=(x_range_min, x_range_max)), 
+data['Avg snow cannons per run'] = data['Snow cannons'] / data['Total slopes']
+
+weights = {
+    'Price': -price_slider.value,
+    'Height': elevation_slider.value,
+    'Total slopes': totalRun_slider.value,
+    'Total lifts': numberOfLifts_slider.value,
+    'Longest run': longestRunLength_slider.value,
+    'Avg snow cannons per run': -snowCannonSlider.value,
+}
+
+# apply weights and nomalize on scale from 0-100
+data['weighted_Score'] = data.apply(lambda row: sum(row[attr] * weights[attr] for attr in weights), axis=1)
+scaler = MinMaxScaler(feature_range=(0, 100))
+data['normalized_Score'] = scaler.fit_transform(data[['weighted_Score']])
+
+source = ColumnDataSource(data) # main source of data
+
+#---------------------------------------------
+#               Stacked Bars
+#---------------------------------------------
+
+top_10 = data.nlargest(10, 'normalized_Score')
+
+#---------------------------------------------
+#                   Map
+#---------------------------------------------
+TOOLS = "reset,pan,wheel_zoom,box_zoom,hover"
+ski_map = figure(width=1200, height=600, x_range=Range1d(start=x_range_min + 100000, end=x_range_max - 100000, bounds=(x_range_min, x_range_max)), 
             y_range=Range1d(start=y_range_min + 100000, end=y_range_max - 100000, bounds=(y_range_min, y_range_max)),
            x_axis_type="mercator", y_axis_type="mercator", tools=TOOLS)
-p2.add_tile("CartoDB Positron", retina=True)
+ski_map.add_tile("CartoDB Positron", retina=True)
 
-p2.scatter(x='Longitude', y='Latitude', size=4, source=source, color='green', alpha=0.7, legend_label='Points')
+ski_map.scatter(x='Longitude', y='Latitude', size=4, source=source, color='green', alpha=0.7, legend_label='Points')
 
 #---------------------------------------------
 #            Update + Handlers
@@ -181,7 +199,7 @@ country_select.on_change('value', update_selected_values)
 #               Layout and style
 #---------------------------------------------
 
-layout = column(price_slider, div0, p0, div1, p1, div2, country_select, p2)        
+layout = column(div0, basic_bar, div1, basic_scatter, div2, country_select, ski_map)        
 #column(row(), row())          
 
 #output_file("viz.html")
