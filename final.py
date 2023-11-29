@@ -16,6 +16,9 @@
 #   Polish work and add any updates
 
 
+#could use bump charts
+
+
 #Data Source: https://www.kaggle.com/datasets/ulrikthygepedersen/ski-resorts
 
 
@@ -23,7 +26,7 @@ from bokeh.plotting import figure, show, output_file, curdoc
 from bokeh.transform import factor_cmap
 from bokeh.layouts import column, row
 from bokeh.models import ColumnDataSource, Div, Legend, LegendItem, Range1d, Slider, CheckboxGroup, MultiSelect
-from bokeh.palettes import BrBG6, Set1_5, Spectral11
+from bokeh.palettes import BrBG6, Set1_5, HighContrast, Set1_6, Set1_7
 from sklearn.preprocessing import MinMaxScaler
 import pandas as pd
 import sys
@@ -33,6 +36,7 @@ data = pd.read_csv(sys.argv[1], encoding='latin-1')
 
 data['Height'] = data['Highest point'] - data['Lowest point']
 data = data[data['Price'] != 0]
+data['Longest run'] = data['Longest run'].apply(lambda x: 0.5 if x == 0 else x) # to deal with future plotting issues as 0 repersets less than 1 km here
 
 colors = ['#55eb67', '#ffd439', '#19bbdc', '#c965ff', '#ff540a']
 width = '700px'
@@ -108,13 +112,13 @@ div2 = Div(text=text, styles=style)
 
 #value sliders - inverted
 price_slider = Slider(title="How important is affordability?", start=0, end=10, step=1, value=5)
-snowCannonSlider = Slider(title="How important is skiing on real snow?", start=0, end=1350, step=50, value=324)
+snowCannonSlider = Slider(title="How important is skiing on real snow?", start=0, end=10, step=1, value=5)
 
 #value sliders - normal
-elevation_slider = Slider(title="How important is total vertical?", start=0, end=1350, step=50, value=324)
-totalRun_slider = Slider(title="How important is the number of runs?", start=0, end=1350, step=50, value=324)
-longestRunLength_slider = Slider(title="How important is run length?", start=0, end=1350, step=50, value=324)
-numberOfLifts_slider = Slider(title="How important is the number of lifts?", start=0, end=1350, step=50, value=324) #total lifts column
+elevation_slider = Slider(title="How important is total vertical?", start=0, end=10, step=1, value=5)
+totalRun_slider = Slider(title="How important is the number of runs?", start=0, end=10, step=1, value=5)
+longestRunLength_slider = Slider(title="How important is run length?", start=0, end=10, step=1, value=5)
+numberOfLifts_slider = Slider(title="How important is the number of lifts?", start=0, end=10, step=1, value=5) #total lifts column
 
 country_select = MultiSelect(title="Select Countries:", height=300, options=['All'] + sorted(list(set(data['Country']))), value=['All'])
 
@@ -150,9 +154,9 @@ weights = {
 }
 
 # apply weights and nomalize on scale from 0-100
-data['weighted_Score'] = data.apply(lambda row: sum(row[attr] * weights[attr] for attr in weights), axis=1)
+data['Weighted_Score'] = data.apply(lambda row: sum(row[attr] * weights[attr] for attr in weights), axis=1)
 scaler = MinMaxScaler(feature_range=(0, 100))
-data['normalized_Score'] = scaler.fit_transform(data[['weighted_Score']])
+data['Normalized_Score'] = scaler.fit_transform(data[['Weighted_Score']])
 
 source = ColumnDataSource(data) # main source of data
 
@@ -160,7 +164,17 @@ source = ColumnDataSource(data) # main source of data
 #               Stacked Bars
 #---------------------------------------------
 
-top_10 = data.nlargest(10, 'normalized_Score')
+top_10 = data.nlargest(10, 'Normalized_Score')
+resorts = top_10['Resort'].tolist()
+sequences = ['Price', 'Height', 'Total slopes', 'Total lifts', 'Longest run', 'Avg snow cannons per run']
+top_10 = top_10[['Resort', 'Price', 'Height', 'Total slopes', 'Total lifts', 'Longest run', 'Avg snow cannons per run']].copy()
+
+bar_source = ColumnDataSource(data=top_10)
+
+static_sbar = figure(y_range=resorts, width=700, height=400, title="Calculated Rankings",
+                     toolbar_location=None, tools="hover", tooltips="")
+
+static_sbar.hbar_stack(sequences, y='Resort', height=0.5, source=bar_source, color=Set1_6, legend_label=sequences)
 
 #---------------------------------------------
 #                   Map
@@ -199,7 +213,7 @@ country_select.on_change('value', update_selected_values)
 #               Layout and style
 #---------------------------------------------
 
-layout = column(div0, basic_bar, div1, basic_scatter, div2, country_select, ski_map)        
+layout = column(div0, basic_bar, div1, basic_scatter, div2, country_select, row(static_sbar), ski_map)        
 #column(row(), row())          
 
 #output_file("viz.html")
