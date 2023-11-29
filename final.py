@@ -22,10 +22,10 @@
 #Data Source: https://www.kaggle.com/datasets/ulrikthygepedersen/ski-resorts
 
 
-from bokeh.plotting import figure, show, output_file, curdoc
+from bokeh.plotting import figure, curdoc
 from bokeh.transform import factor_cmap
 from bokeh.layouts import column, row
-from bokeh.models import ColumnDataSource, Div, Legend, LegendItem, Range1d, Slider, CheckboxGroup, MultiSelect
+from bokeh.models import ColumnDataSource, Div, Legend, LegendItem, Range1d, Slider, MultiSelect, HoverTool
 from bokeh.palettes import BrBG6, Set1_5, HighContrast, Set1_6, Set1_7
 from sklearn.preprocessing import MinMaxScaler
 import pandas as pd
@@ -164,9 +164,9 @@ attributes = ['Price', 'Height', 'Total slopes', 'Total lifts', 'Longest run', '
 data['Normalized_Score'] = 0
 
 scaler = MinMaxScaler(feature_range=(0, 2))
-for column in attributes:
-    new_column = f'{column}_nrm'
-    values = data[column].values.reshape(-1, 1)
+for x in attributes:
+    new_column = f'{x}_nrm'
+    values = data[x].values.reshape(-1, 1)
     normalized_values = scaler.fit_transform(values)
     if weights[new_column] >= 0:
         data[new_column] = normalized_values.flatten() * weights[new_column]
@@ -175,6 +175,7 @@ for column in attributes:
     data['Normalized_Score'] += data[new_column]
 
 source = ColumnDataSource(data) # main source of data
+
 
 #---------------------------------------------
 #               Stacked Bars
@@ -192,10 +193,13 @@ sequences = ['Price_nrm', 'Height_nrm', 'Total slopes_nrm', 'Total lifts_nrm', '
 top_10 = top_10[['Resort', 'Price_nrm', 'Height_nrm', 'Total slopes_nrm', 'Total lifts_nrm', 'Longest run_nrm', 'Avg snow cannons per run_nrm']].copy()
 bar_source = ColumnDataSource(data=top_10)
 
-static_sbar = figure(y_range=resorts, width=700, height=400, title="Calculated Rankings",
-                     toolbar_location=None, tools="hover", tooltips="")
+static_sbar = figure(y_range=resorts, width=800, height=600, title="", toolbar_location=None, tools="")
 
-static_sbar.hbar_stack(sequences, y='Resort', height=0.5, source=bar_source, color=Set1_6, legend_label=sequences)
+fig = static_sbar.hbar_stack(sequences, y='Resort', height=0.5, source=bar_source, color=Set1_6)
+legend = Legend(items=[(seq, [static_sbar.renderers[i]]) for i, seq in enumerate(sequences)], location=(-100, 20), 
+                label_text_font_size='10pt', label_standoff=4)
+
+static_sbar.add_layout(legend, 'above')
 
 #---------------------------------------------
 #                   Map
