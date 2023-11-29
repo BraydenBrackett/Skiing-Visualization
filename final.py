@@ -16,7 +16,8 @@
 #   Polish work and add any updates
 
 
-#could use bump charts
+# TBD
+# - Add hover features to the bar charts?
 
 
 #Data Source: https://www.kaggle.com/datasets/ulrikthygepedersen/ski-resorts
@@ -34,9 +35,14 @@ import numpy as np
 
 data = pd.read_csv(sys.argv[1], encoding='latin-1')
 
+for x in data.columns:
+    if data[x].dtype == 'O':
+        data[x] = data[x].str.replace('?', '') #crude fix as original data scapping didn't use correct encoding
+
 data['Height'] = data['Highest point'] - data['Lowest point']
 data = data[data['Price'] != 0]
 data['Longest run'] = data['Longest run'].apply(lambda x: 0.5 if x == 0 else x) # to deal with future plotting issues as 0 repersets less than 1 km here
+data = data[~data['Resort'].str.contains('/')] # removing rows where it's an aggregate of resorts
 
 colors = ['#55eb67', '#ffd439', '#19bbdc', '#c965ff', '#ff540a']
 width = '700px'
