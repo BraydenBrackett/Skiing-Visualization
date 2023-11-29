@@ -145,18 +145,34 @@ y_range_max = data['Latitude'].max() + 2000000
 data['Avg snow cannons per run'] = data['Snow cannons'] / data['Total slopes']
 
 weights = {
-    'Price': -price_slider.value,
-    'Height': elevation_slider.value,
-    'Total slopes': totalRun_slider.value,
-    'Total lifts': numberOfLifts_slider.value,
-    'Longest run': longestRunLength_slider.value,
-    'Avg snow cannons per run': -snowCannonSlider.value,
+    'Price_nrm': -price_slider.value,
+    'Height_nrm': elevation_slider.value,
+    'Total slopes_nrm': totalRun_slider.value,
+    'Total lifts_nrm': numberOfLifts_slider.value,
+    'Longest run_nrm': longestRunLength_slider.value,
+    'Avg snow cannons per run_nrm': -snowCannonSlider.value,
 }
 
 # apply weights and nomalize on scale from 0-100
-data['Weighted_Score'] = data.apply(lambda row: sum(row[attr] * weights[attr] for attr in weights), axis=1)
-scaler = MinMaxScaler(feature_range=(0, 100))
-data['Normalized_Score'] = scaler.fit_transform(data[['Weighted_Score']])
+#data['Weighted_Score'] = data.apply(lambda row: sum(row[attr] * weights[attr] for attr in weights), axis=1)
+#scaler = MinMaxScaler(feature_range=(0, 100))
+#data['Normalized_Score'] = scaler.fit_transform(data[['Weighted_Score']])
+
+# normalizing each attribute into a new column
+attributes = ['Price', 'Height', 'Total slopes', 'Total lifts', 'Longest run', 'Avg snow cannons per run']
+
+data['Normalized_Score'] = 0
+
+scaler = MinMaxScaler(feature_range=(0, 2))
+for column in attributes:
+    new_column = f'{column}_nrm'
+    values = data[column].values.reshape(-1, 1)
+    normalized_values = scaler.fit_transform(values)
+    if weights[new_column] >= 0:
+        data[new_column] = normalized_values.flatten() * weights[new_column]
+    else:
+        data[new_column] = normalized_values.flatten() * (10 - weights[new_column])
+    data['Normalized_Score'] += data[new_column]
 
 source = ColumnDataSource(data) # main source of data
 
@@ -164,11 +180,16 @@ source = ColumnDataSource(data) # main source of data
 #               Stacked Bars
 #---------------------------------------------
 
+#top_10 = data.nlargest(10, 'Normalized_Score')
+#resorts = top_10['Resort'].tolist()
+#sequences = ['Price', 'Height', 'Total slopes', 'Total lifts', 'Longest run', 'Avg snow cannons per run']
+#top_10 = top_10[['Resort', 'Price', 'Height', 'Total slopes', 'Total lifts', 'Longest run', 'Avg snow cannons per run']].copy()
+#bar_source = ColumnDataSource(data=top_10)
+
 top_10 = data.nlargest(10, 'Normalized_Score')
 resorts = top_10['Resort'].tolist()
-sequences = ['Price', 'Height', 'Total slopes', 'Total lifts', 'Longest run', 'Avg snow cannons per run']
-top_10 = top_10[['Resort', 'Price', 'Height', 'Total slopes', 'Total lifts', 'Longest run', 'Avg snow cannons per run']].copy()
-
+sequences = ['Price_nrm', 'Height_nrm', 'Total slopes_nrm', 'Total lifts_nrm', 'Longest run_nrm', 'Avg snow cannons per run_nrm']
+top_10 = top_10[['Resort', 'Price_nrm', 'Height_nrm', 'Total slopes_nrm', 'Total lifts_nrm', 'Longest run_nrm', 'Avg snow cannons per run_nrm']].copy()
 bar_source = ColumnDataSource(data=top_10)
 
 static_sbar = figure(y_range=resorts, width=700, height=400, title="Calculated Rankings",
