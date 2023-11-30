@@ -17,7 +17,8 @@
 
 
 # TBD
-# - Add hover features to the bar charts?
+# - Add top 10 feature for maps?
+# - fix bar stretching
 
 
 #Data Source: https://www.kaggle.com/datasets/ulrikthygepedersen/ski-resorts
@@ -26,7 +27,7 @@
 from bokeh.plotting import figure, curdoc
 from bokeh.transform import factor_cmap
 from bokeh.layouts import column, row
-from bokeh.models import ColumnDataSource, Div, Legend, LegendItem, Range1d, Slider, MultiSelect, HoverTool
+from bokeh.models import ColumnDataSource, Div, Legend, LegendItem, Range1d, Slider, MultiSelect, HoverTool, FactorRange
 from bokeh.palettes import BrBG6, Set1_5, HighContrast, Set1_6, Set1_7
 from sklearn.preprocessing import MinMaxScaler
 import pandas as pd
@@ -117,23 +118,23 @@ div2 = Div(text=text, styles=style)
 #---------------------------------------------
 
 #value sliders - inverted
-price_slider = Slider(title="How important is affordability?", start=0, end=10, step=1, value=5)
+price_slider = Slider(title="How important is affordability", start=0, end=10, step=1, value=5)
 snowCannonSlider = Slider(title="How important is skiing on real snow?", start=0, end=10, step=1, value=5)
 
 #value sliders - normal
-elevation_slider = Slider(title="How important is total vertical?", start=0, end=10, step=1, value=5)
-totalRun_slider = Slider(title="How important is the number of runs?", start=0, end=10, step=1, value=5)
-longestRunLength_slider = Slider(title="How important is run length?", start=0, end=10, step=1, value=5)
-numberOfLifts_slider = Slider(title="How important is the number of lifts?", start=0, end=10, step=1, value=5) #total lifts column
+elevation_slider = Slider(title="How important is total vertical", start=0, end=10, step=1, value=5)
+totalRun_slider = Slider(title="How important is the number of runs", start=0, end=10, step=1, value=5)
+longestRunLength_slider = Slider(title="How important is run length", start=0, end=10, step=1, value=5)
+numberOfLifts_slider = Slider(title="How important is the number of lifts", start=0, end=10, step=1, value=5) #total lifts column
 
 country_select = MultiSelect(title="Select Countries:", height=300, options=['All'] + sorted(list(set(data['Country']))), value=['All'])
 
 #categorical sliders (must not have - don't care - must have)
 #TODO: have text explaining each of the numerical values here
-childFriendly_slider = Slider(title="Min Edge Weight", start=0, end=2, step=1, value=1)
-snowpark_slider = Slider(title="Min Edge Weight", start=0, end=2, step=1, value=1)
-nightskiing_slider = Slider(title="Min Edge Weight", start=0, end=2, step=1, value=1)
-summerskiing_slider = Slider(title="Min Edge Weight", start=0, end=2, step=1, value=1)
+childFriendly_slider = Slider(title="Child friendly", start=0, end=2, step=1, value=1)
+snowpark_slider = Slider(title="Snowparks", start=0, end=2, step=1, value=1)
+nightskiing_slider = Slider(title="Nightskiing", start=0, end=2, step=1, value=1)
+summerskiing_slider = Slider(title="Summer skiing", start=0, end=2, step=1, value=1)
 
 #---------------------------------------------
 #        Data Formatting + Normalizing
@@ -150,35 +151,34 @@ y_range_max = data['Latitude'].max() + 2000000
 
 data['Avg snow cannons per run'] = data['Snow cannons'] / data['Total slopes']
 
-weights = {
-    'Price_nrm': -price_slider.value,
+# resets rankings
+def adjust_weights():
+    weights = {
+    'Price_nrm': price_slider.value,
     'Height_nrm': elevation_slider.value,
     'Total slopes_nrm': totalRun_slider.value,
     'Total lifts_nrm': numberOfLifts_slider.value,
     'Longest run_nrm': longestRunLength_slider.value,
-    'Avg snow cannons per run_nrm': -snowCannonSlider.value,
-}
+    'Avg snow cannons per run_nrm': snowCannonSlider.value,
+    }
 
-# apply weights and nomalize on scale from 0-100
-#data['Weighted_Score'] = data.apply(lambda row: sum(row[attr] * weights[attr] for attr in weights), axis=1)
-#scaler = MinMaxScaler(feature_range=(0, 100))
-#data['Normalized_Score'] = scaler.fit_transform(data[['Weighted_Score']])
+    # apply weights and nomalize on scale from 0-100
+    attributes = ['Price', 'Height', 'Total slopes', 'Total lifts', 'Longest run', 'Avg snow cannons per run']
 
-# normalizing each attribute into a new column
-attributes = ['Price', 'Height', 'Total slopes', 'Total lifts', 'Longest run', 'Avg snow cannons per run']
+    data['Normalized_Score'] = 0
 
-data['Normalized_Score'] = 0
+    scaler = MinMaxScaler(feature_range=(0, 2))
+    for x in attributes:
+        new_column = f'{x}_nrm'
+        values = data[x].values.reshape(-1, 1)
+        normalized_values = scaler.fit_transform(values)
+        if new_column != 'Avg snow cannons per run_nrm' and new_column != 'Price_nrm':
+            data[new_column] = normalized_values.flatten() * weights[new_column]
+        else:
+            data[new_column] = normalized_values.flatten() * (10 - weights[new_column])
+        data['Normalized_Score'] += data[new_column]
 
-scaler = MinMaxScaler(feature_range=(0, 2))
-for x in attributes:
-    new_column = f'{x}_nrm'
-    values = data[x].values.reshape(-1, 1)
-    normalized_values = scaler.fit_transform(values)
-    if weights[new_column] >= 0:
-        data[new_column] = normalized_values.flatten() * weights[new_column]
-    else:
-        data[new_column] = normalized_values.flatten() * (10 - weights[new_column])
-    data['Normalized_Score'] += data[new_column]
+adjust_weights()
 
 source = ColumnDataSource(data) # main source of data
 
@@ -187,25 +187,27 @@ source = ColumnDataSource(data) # main source of data
 #               Stacked Bars
 #---------------------------------------------
 
-#top_10 = data.nlargest(10, 'Normalized_Score')
-#resorts = top_10['Resort'].tolist()
-#sequences = ['Price', 'Height', 'Total slopes', 'Total lifts', 'Longest run', 'Avg snow cannons per run']
-#top_10 = top_10[['Resort', 'Price', 'Height', 'Total slopes', 'Total lifts', 'Longest run', 'Avg snow cannons per run']].copy()
-#bar_source = ColumnDataSource(data=top_10)
-
-top_10 = data.nlargest(10, 'Normalized_Score')
+top_10 = data.nlargest(10, 'Normalized_Score').sort_values(by='Normalized_Score', ascending=True)
 resorts = top_10['Resort'].tolist()
 sequences = ['Price_nrm', 'Height_nrm', 'Total slopes_nrm', 'Total lifts_nrm', 'Longest run_nrm', 'Avg snow cannons per run_nrm']
-top_10 = top_10[['Resort', 'Price_nrm', 'Height_nrm', 'Total slopes_nrm', 'Total lifts_nrm', 'Longest run_nrm', 'Avg snow cannons per run_nrm']].copy()
+top_10 = top_10[['Resort', 'Price', 'Height', 'Total slopes', 'Total lifts', 'Longest run', 'Avg snow cannons per run', 'Price_nrm', 'Height_nrm',
+                'Total slopes_nrm', 'Total lifts_nrm', 'Longest run_nrm', 'Avg snow cannons per run_nrm']].copy()
 bar_source = ColumnDataSource(data=top_10)
 
 static_sbar = figure(y_range=resorts, width=800, height=600, title="", toolbar_location=None, tools="")
 
-fig = static_sbar.hbar_stack(sequences, y='Resort', height=0.5, source=bar_source, color=Set1_6)
+static_sbar.hbar_stack(sequences, y='Resort', height=0.5, source=bar_source, color=Set1_6)
 legend = Legend(items=[(seq, [static_sbar.renderers[i]]) for i, seq in enumerate(sequences)], location=(-100, 20), 
                 label_text_font_size='10pt', label_standoff=4)
 
 static_sbar.add_layout(legend, 'above')
+
+for r in static_sbar.renderers:
+    layer = r.name
+    hover = HoverTool(tooltips=[
+        ("%s" % layer.replace('_nrm', ''), "@{%s}" % layer.replace('_nrm', ''))
+    ], renderers=[r])
+    static_sbar.add_tools(hover)
 
 #---------------------------------------------
 #                   Map
@@ -223,28 +225,49 @@ ski_map.scatter(x='Longitude', y='Latitude', size=4, source=source, color='green
 #---------------------------------------------
 
 # Update functions
-def update(attr, old, new):
-    print("eeeeeeeeeeeeeeeee")
+def update_rankings(attr, old, new):
 
-def update_selected_values(attr, old, new):
-    print(country_select.value)
+    #update rankings
+    adjust_weights()
+
+    # updating the map + bar
     if country_select.value == ['All']:
         map_filter_data = data
     else:
         map_filter_data = data[data['Country'].isin(country_select.value)]
+
+    check_sliders = [childFriendly_slider, snowpark_slider, nightskiing_slider, summerskiing_slider]
+    for x in check_sliders:
+        if (x.value == 0):
+            column_name = x.title
+            map_filter_data = map_filter_data[map_filter_data[column_name] == 'No']
+        if (x.value == 2):
+            column_name = x.title
+            map_filter_data = map_filter_data[map_filter_data[column_name] == 'Yes']
+            
+
+    top_10 = map_filter_data.nlargest(10, 'Normalized_Score').sort_values(by='Normalized_Score', ascending=True)
+    resorts = top_10['Resort'].tolist()
+    top_10 = top_10[['Resort', 'Price', 'Height', 'Total slopes', 'Total lifts', 'Longest run', 'Avg snow cannons per run', 'Price_nrm', 'Height_nrm',
+                    'Total slopes_nrm', 'Total lifts_nrm', 'Longest run_nrm', 'Avg snow cannons per run_nrm']].copy()
+    bar_source.data = top_10
+    static_sbar.y_range.factors = resorts
+
     source.data = map_filter_data
 
 # Handlers
-for widget in [price_slider, elevation_slider]:
-    widget.on_change('value', update)
+for widget in [price_slider, elevation_slider, country_select, totalRun_slider, longestRunLength_slider, numberOfLifts_slider, 
+               snowCannonSlider, childFriendly_slider, snowpark_slider, nightskiing_slider, summerskiing_slider]:
+    widget.on_change('value', update_rankings)
 
-country_select.on_change('value', update_selected_values)
+#country_select.on_change('value', update_countries)
 
 #---------------------------------------------
 #               Layout and style
 #---------------------------------------------
 
-layout = column(div0, basic_bar, div1, basic_scatter, div2, country_select, row(static_sbar), ski_map)        
+layout = column(div0, basic_bar, div1, basic_scatter, div2, country_select, row(price_slider, elevation_slider, totalRun_slider), 
+row(numberOfLifts_slider, longestRunLength_slider, snowCannonSlider), row(childFriendly_slider, snowpark_slider, nightskiing_slider, summerskiing_slider), row(static_sbar), ski_map)        
 #column(row(), row())          
 
 #output_file("viz.html")
