@@ -7,9 +7,9 @@
 #  + Complete intro and intro analysis
 #  + Create map with resorts
 # Week 3:
-#   Get sliders/dropdowns functioning and basic ranking table working
+#  + Get sliders/dropdowns functioning and basic ranking table working
 #  + Complete algorithm for calculating new ranking table
-#   Begin work on new ranking table
+#  + Begin work on new ranking table
 # Week 4:
 #   Finish new ranking table
 # Week 5:
@@ -119,7 +119,7 @@ div2 = Div(text=text, styles=style)
 
 #value sliders - inverted
 price_slider = Slider(title="How important is affordability", start=0, end=10, step=1, value=5)
-snowCannonSlider = Slider(title="How important is skiing on real snow?", start=0, end=10, step=1, value=5)
+snowCannonSlider = Slider(title="How important is skiing on real snow", start=0, end=10, step=1, value=5)
 
 #value sliders - normal
 elevation_slider = Slider(title="How important is total vertical", start=0, end=10, step=1, value=5)
@@ -194,6 +194,7 @@ top_10 = top_10[['Resort', 'Price', 'Height', 'Total slopes', 'Total lifts', 'Lo
                 'Total slopes_nrm', 'Total lifts_nrm', 'Longest run_nrm', 'Avg snow cannons per run_nrm']].copy()
 bar_source = ColumnDataSource(data=top_10)
 
+#height was 600
 static_sbar = figure(y_range=resorts, width=800, height=600, title="", toolbar_location=None, tools="")
 
 static_sbar.hbar_stack(sequences, y='Resort', height=0.5, source=bar_source, color=Set1_6)
@@ -252,6 +253,12 @@ def update_rankings(attr, old, new):
                     'Total slopes_nrm', 'Total lifts_nrm', 'Longest run_nrm', 'Avg snow cannons per run_nrm']].copy()
     bar_source.data = top_10
     static_sbar.y_range.factors = resorts
+
+    new_height = 60*top_10.shape[0]
+    if (new_height < 300):
+        new_height = 300
+
+    static_sbar.height = new_height
 
     source.data = map_filter_data
 
