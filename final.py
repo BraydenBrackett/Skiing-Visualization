@@ -18,17 +18,17 @@
 
 # TBD
 # - Add top 10 feature for maps?
-# - fix bar stretching
+# - 3D globe?
 
 
 #Data Source: https://www.kaggle.com/datasets/ulrikthygepedersen/ski-resorts
 
 
 from bokeh.plotting import figure, curdoc
-from bokeh.transform import factor_cmap
+from bokeh.transform import factor_cmap, linear_cmap
 from bokeh.layouts import column, row
-from bokeh.models import ColumnDataSource, Div, Legend, LegendItem, Range1d, Slider, MultiSelect, HoverTool, FactorRange
-from bokeh.palettes import BrBG6, Set1_5, HighContrast, Set1_6, Set1_7
+from bokeh.models import ColumnDataSource, Div, Legend, LegendItem, Range1d, Slider, MultiSelect, HoverTool, ColorBar
+from bokeh.palettes import BrBG6, Set1_5, HighContrast, Set1_6, Set1_7, Viridis256
 from sklearn.preprocessing import MinMaxScaler
 import pandas as pd
 import sys
@@ -36,18 +36,20 @@ import numpy as np
 
 data = pd.read_csv(sys.argv[1], encoding='latin-1')
 
+#data cleanup
 for x in data.columns:
     if data[x].dtype == 'O':
         data[x] = data[x].str.replace('?', '') #crude fix as original data scapping didn't use correct encoding
 
 data['Height'] = data['Highest point'] - data['Lowest point']
 data = data[data['Price'] != 0]
-data['Longest run'] = data['Longest run'].apply(lambda x: 0.5 if x == 0 else x) # to deal with future plotting issues as 0 repersets less than 1 km here
+data['Longest run'] = data['Longest run'].apply(lambda x: 1 if x == 0 else x) # to deal with future plotting issues as 0 repersets less than 1 km here
 data = data[~data['Resort'].str.contains('/')] # removing rows where it's an aggregate of resorts
+data['Resort'] = data['Resort'].str.split('-').str[0]
 
+#styling
 colors = ['#55eb67', '#ffd439', '#19bbdc', '#c965ff', '#ff540a']
 width = '700px'
-
 style = {
     'word-wrap': 'break-word',
     'width': width,
@@ -150,16 +152,17 @@ y_range_min = data['Latitude'].min() - 2000000
 y_range_max = data['Latitude'].max() + 2000000
 
 data['Avg snow cannons per run'] = data['Snow cannons'] / data['Total slopes']
-
 # resets rankings
 def adjust_weights():
+    
+    #weights adjusted for top normalization total to be around 100
     weights = {
-    'Price_nrm': price_slider.value,
-    'Height_nrm': elevation_slider.value,
-    'Total slopes_nrm': totalRun_slider.value,
-    'Total lifts_nrm': numberOfLifts_slider.value,
-    'Longest run_nrm': longestRunLength_slider.value,
-    'Avg snow cannons per run_nrm': snowCannonSlider.value,
+    'Price_nrm': price_slider.value * 0.55,
+    'Height_nrm': elevation_slider.value  * 0.55,
+    'Total slopes_nrm': totalRun_slider.value  * 0.55,
+    'Total lifts_nrm': numberOfLifts_slider.value  * 0.55,
+    'Longest run_nrm': longestRunLength_slider.value  * 0.55,
+    'Avg snow cannons per run_nrm': snowCannonSlider.value  * 0.55,
     }
 
     # apply weights and nomalize on scale from 0-100
@@ -167,18 +170,24 @@ def adjust_weights():
 
     data['Normalized_Score'] = 0
 
-    scaler = MinMaxScaler(feature_range=(0, 2))
+    scaler = MinMaxScaler(feature_range=(0, 4))
     for x in attributes:
         new_column = f'{x}_nrm'
         values = data[x].values.reshape(-1, 1)
         normalized_values = scaler.fit_transform(values)
-        if new_column != 'Avg snow cannons per run_nrm' and new_column != 'Price_nrm':
+        if new_column == 'Longest run_nrm':
+            normalized_values[normalized_values == 0.0] = 0.3
+            data[new_column] = normalized_values.flatten() * weights[new_column]
+        elif new_column != 'Avg snow cannons per run_nrm' and new_column != 'Price_nrm':
             data[new_column] = normalized_values.flatten() * weights[new_column]
         else:
             data[new_column] = normalized_values.flatten() * (10 - weights[new_column])
         data['Normalized_Score'] += data[new_column]
 
+    data['Rank'] = data['Normalized_Score'].rank(ascending=False)
+
 adjust_weights()
+color_mapper = linear_cmap(field_name='Rank', palette=Viridis256, low=min(data['Rank']), high=max(data['Rank']))
 
 source = ColumnDataSource(data) # main source of data
 
@@ -187,7 +196,8 @@ source = ColumnDataSource(data) # main source of data
 #               Stacked Bars
 #---------------------------------------------
 
-top_10 = data.nlargest(10, 'Normalized_Score').sort_values(by='Normalized_Score', ascending=True)
+#top_10 = data.nlargest(10, 'Normalized_Score').sort_values(by='Normalized_Score', ascending=True)
+top_10 = data.sort_values(by='Normalized_Score', ascending=True)
 resorts = top_10['Resort'].tolist()
 sequences = ['Price_nrm', 'Height_nrm', 'Total slopes_nrm', 'Total lifts_nrm', 'Longest run_nrm', 'Avg snow cannons per run_nrm']
 top_10 = top_10[['Resort', 'Price', 'Height', 'Total slopes', 'Total lifts', 'Longest run', 'Avg snow cannons per run', 'Price_nrm', 'Height_nrm',
@@ -195,10 +205,14 @@ top_10 = top_10[['Resort', 'Price', 'Height', 'Total slopes', 'Total lifts', 'Lo
 bar_source = ColumnDataSource(data=top_10)
 
 #height was 600
-static_sbar = figure(y_range=resorts, width=800, height=600, title="", toolbar_location=None, tools="")
+new_height = 60*top_10.shape[0]
+if (new_height < 300):
+    new_height = 300
+
+static_sbar = figure(y_range=resorts, width=1200, height=new_height, title="", toolbar_location=None, tools="", margin=(0, 50, 0, 50), sizing_mode="fixed")
 
 static_sbar.hbar_stack(sequences, y='Resort', height=0.5, source=bar_source, color=Set1_6)
-legend = Legend(items=[(seq, [static_sbar.renderers[i]]) for i, seq in enumerate(sequences)], location=(-100, 20), 
+legend = Legend(items=[(seq, [static_sbar.renderers[i]]) for i, seq in enumerate(sequences)], location=(100, 20), 
                 label_text_font_size='10pt', label_standoff=4)
 
 static_sbar.add_layout(legend, 'above')
@@ -213,13 +227,28 @@ for r in static_sbar.renderers:
 #---------------------------------------------
 #                   Map
 #---------------------------------------------
-TOOLS = "reset,pan,wheel_zoom,box_zoom,hover"
+
+TOOLS = "reset,pan,wheel_zoom,box_zoom"
 ski_map = figure(width=1200, height=600, x_range=Range1d(start=x_range_min + 100000, end=x_range_max - 100000, bounds=(x_range_min, x_range_max)), 
             y_range=Range1d(start=y_range_min + 100000, end=y_range_max - 100000, bounds=(y_range_min, y_range_max)),
            x_axis_type="mercator", y_axis_type="mercator", tools=TOOLS)
 ski_map.add_tile("CartoDB Positron", retina=True)
 
-ski_map.scatter(x='Longitude', y='Latitude', size=4, source=source, color='green', alpha=0.7, legend_label='Points')
+c = ski_map.scatter(x='Longitude', y='Latitude', size=6, source=source, color=color_mapper, alpha=0.7, legend_label='Resorts')
+color_bar = ColorBar(color_mapper=color_mapper['transform'], width=8, location=(0, 0))
+ski_map.add_layout(color_bar, 'right')
+
+hover_tool_nodes = HoverTool(renderers=[c], tooltips= [
+        ("Rank", "@Rank"),
+        ("Resort", "@Resort"),
+        ("Day Ticket Price", "$@Price"),
+        ("Total Elevation", "@Height m"),
+        ("Num Runs", "@{Total slopes}"),
+        ("Num Lifts", "@{Total lifts}"),
+        ("Longest Run", "@{Longest run} km"),
+        ("Avg Snow Cannons per Run", "@{Avg snow cannons per run}")
+])
+ski_map.add_tools(hover_tool_nodes)
 
 #---------------------------------------------
 #            Update + Handlers
@@ -230,6 +259,7 @@ def update_rankings(attr, old, new):
 
     #update rankings
     adjust_weights()
+    #color_mapper = linear_cmap(field_name='Rank', palette=Viridis256, low=min(data['Rank']), high=max(data['Rank']))
 
     # updating the map + bar
     if country_select.value == ['All']:
@@ -247,7 +277,8 @@ def update_rankings(attr, old, new):
             map_filter_data = map_filter_data[map_filter_data[column_name] == 'Yes']
             
 
-    top_10 = map_filter_data.nlargest(10, 'Normalized_Score').sort_values(by='Normalized_Score', ascending=True)
+    #top_10 = map_filter_data.nlargest(10, 'Normalized_Score').sort_values(by='Normalized_Score', ascending=True)
+    top_10 = map_filter_data.sort_values(by='Normalized_Score', ascending=True)
     resorts = top_10['Resort'].tolist()
     top_10 = top_10[['Resort', 'Price', 'Height', 'Total slopes', 'Total lifts', 'Longest run', 'Avg snow cannons per run', 'Price_nrm', 'Height_nrm',
                     'Total slopes_nrm', 'Total lifts_nrm', 'Longest run_nrm', 'Avg snow cannons per run_nrm']].copy()
@@ -274,7 +305,7 @@ for widget in [price_slider, elevation_slider, country_select, totalRun_slider, 
 #---------------------------------------------
 
 layout = column(div0, basic_bar, div1, basic_scatter, div2, country_select, row(price_slider, elevation_slider, totalRun_slider), 
-row(numberOfLifts_slider, longestRunLength_slider, snowCannonSlider), row(childFriendly_slider, snowpark_slider, nightskiing_slider, summerskiing_slider), row(static_sbar), ski_map)        
+row(numberOfLifts_slider, longestRunLength_slider, snowCannonSlider), row(childFriendly_slider, snowpark_slider, nightskiing_slider, summerskiing_slider), ski_map, row(static_sbar))        
 #column(row(), row())          
 
 #output_file("viz.html")
