@@ -259,9 +259,12 @@ def update_rankings(attr, old, new):
 
     #update rankings0
     adjust_weights()
-    color_mapper = linear_cmap(field_name='Rank', palette=Viridis256, low=min(data['Rank']), high=max(data['Rank']))
+    color_mapper = linear_cmap(field_name='Rank', palette=Viridis256, low=max(data['Rank']), high=min(data['Rank']))
     s.glyph.fill_color = color_mapper
+    s.glyph.line_color = color_mapper
     color_bar.color_mapper=color_mapper['transform']
+
+    #TODO: something wrong here - colors only change once
 
     # updating the map + bar
     if country_select.value == ['All']:
