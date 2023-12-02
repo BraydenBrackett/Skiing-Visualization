@@ -187,7 +187,7 @@ def adjust_weights():
     data['Rank'] = data['Normalized_Score'].rank(ascending=False)
 
 adjust_weights()
-color_mapper = linear_cmap(field_name='Rank', palette=Viridis256, low=min(data['Rank']), high=max(data['Rank']))
+color_mapper = linear_cmap(field_name='Rank', palette=Viridis256, high=min(data['Rank']), low=max(data['Rank']))
 
 source = ColumnDataSource(data) # main source of data
 
@@ -234,11 +234,11 @@ ski_map = figure(width=1200, height=600, x_range=Range1d(start=x_range_min + 100
            x_axis_type="mercator", y_axis_type="mercator", tools=TOOLS)
 ski_map.add_tile("CartoDB Positron", retina=True)
 
-c = ski_map.scatter(x='Longitude', y='Latitude', size=6, source=source, color=color_mapper, alpha=0.7, legend_label='Resorts')
-color_bar = ColorBar(color_mapper=color_mapper['transform'], width=8, location=(0, 0))
+s = ski_map.scatter(x='Longitude', y='Latitude', size=6, source=source, color=color_mapper, alpha=0.8)
+color_bar = ColorBar(title="Rank", color_mapper=color_mapper['transform'], width=12, location=(0, 0))
 ski_map.add_layout(color_bar, 'right')
 
-hover_tool_nodes = HoverTool(renderers=[c], tooltips= [
+hover_tool_nodes = HoverTool(renderers=[s], tooltips= [
         ("Rank", "@Rank"),
         ("Resort", "@Resort"),
         ("Day Ticket Price", "$@Price"),
@@ -257,9 +257,11 @@ ski_map.add_tools(hover_tool_nodes)
 # Update functions
 def update_rankings(attr, old, new):
 
-    #update rankings
+    #update rankings0
     adjust_weights()
-    #color_mapper = linear_cmap(field_name='Rank', palette=Viridis256, low=min(data['Rank']), high=max(data['Rank']))
+    color_mapper = linear_cmap(field_name='Rank', palette=Viridis256, low=min(data['Rank']), high=max(data['Rank']))
+    s.glyph.fill_color = color_mapper
+    color_bar.color_mapper=color_mapper['transform']
 
     # updating the map + bar
     if country_select.value == ['All']:
