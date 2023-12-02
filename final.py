@@ -9,7 +9,7 @@
 # Week 3:
 #  + Get sliders/dropdowns functioning and basic ranking table working
 #  + Complete algorithm for calculating new ranking table
-#  + Begin work on new ranking table
+#  + Begin work on new ranking table (decided against this and added more granularity to existing features)
 # Week 4:
 #   Finish new ranking table
 # Week 5:
@@ -29,6 +29,7 @@ from bokeh.transform import factor_cmap, linear_cmap
 from bokeh.layouts import column, row
 from bokeh.models import ColumnDataSource, Div, Legend, LegendItem, Range1d, Slider, MultiSelect, HoverTool, ColorBar
 from bokeh.palettes import BrBG6, Set1_5, HighContrast, Set1_6, Set1_7, Viridis256
+from bokeh.events import SelectionGeometry
 from sklearn.preprocessing import MinMaxScaler
 import pandas as pd
 import sys
@@ -228,7 +229,7 @@ for r in static_sbar.renderers:
 #                   Map
 #---------------------------------------------
 
-TOOLS = "reset,pan,wheel_zoom,box_zoom"
+TOOLS = "reset,pan,wheel_zoom,box_select"
 ski_map = figure(width=1200, height=600, x_range=Range1d(start=x_range_min + 100000, end=x_range_max - 100000, bounds=(x_range_min, x_range_max)), 
             y_range=Range1d(start=y_range_min + 100000, end=y_range_max - 100000, bounds=(y_range_min, y_range_max)),
            x_axis_type="mercator", y_axis_type="mercator", tools=TOOLS)
@@ -254,23 +255,41 @@ ski_map.add_tools(hover_tool_nodes)
 #            Update + Handlers
 #---------------------------------------------
 
+used_box_select = False
+
+# Functions for box select events
+def set_bs_flag(event):
+    global used_box_select
+    used_box_select = True
+    update_rankings(None, None, None)
+
+def reset_bs_flag(attr, old, new):
+    global used_box_select
+    used_box_select = False
+    update_rankings(None, None, None)
+
 # Update functions
 def update_rankings(attr, old, new):
 
-    #update rankings0
+    # update rankings
     adjust_weights()
     color_mapper = linear_cmap(field_name='Rank', palette=Viridis256, low=max(data['Rank']), high=min(data['Rank']))
     s.glyph.fill_color = color_mapper
-    s.glyph.line_color = color_mapper
+    #s.glyph.line_color = color_mapper
     color_bar.color_mapper=color_mapper['transform']
 
-    #TODO: something wrong here - colors only change once
-
     # updating the map + bar
-    if country_select.value == ['All']:
-        map_filter_data = data
+    if used_box_select == True:
+            selected_indices = source.selected.indices
+            
+            selected_data = {key: source.data[key][selected_indices] for key in source.data}
+            map_filter_data = pd.DataFrame(selected_data)
     else:
-        map_filter_data = data[data['Country'].isin(country_select.value)]
+        source.selected.indices = []
+        if country_select.value == ['All']:
+            map_filter_data = data
+        else:
+            map_filter_data = data[data['Country'].isin(country_select.value)]
 
     check_sliders = [childFriendly_slider, snowpark_slider, nightskiing_slider, summerskiing_slider]
     for x in check_sliders:
@@ -295,15 +314,19 @@ def update_rankings(attr, old, new):
         new_height = 300
 
     static_sbar.height = new_height
-
-    source.data = map_filter_data
+    
+    if used_box_select == False:
+        source.data = map_filter_data
 
 # Handlers
-for widget in [price_slider, elevation_slider, country_select, totalRun_slider, longestRunLength_slider, numberOfLifts_slider, 
+country_select.on_change('value', reset_bs_flag)
+
+for widget in [price_slider, elevation_slider, totalRun_slider, longestRunLength_slider, numberOfLifts_slider, 
                snowCannonSlider, childFriendly_slider, snowpark_slider, nightskiing_slider, summerskiing_slider]:
     widget.on_change('value', update_rankings)
 
-#country_select.on_change('value', update_countries)
+
+ski_map.on_event(SelectionGeometry, set_bs_flag)
 
 #---------------------------------------------
 #               Layout and style
@@ -317,7 +340,6 @@ row(numberOfLifts_slider, longestRunLength_slider, snowCannonSlider), row(childF
 #show(layout)
 
 curdoc().add_root(layout)
-
 
 
 
