@@ -28,7 +28,7 @@
 
 from bokeh.plotting import figure, curdoc
 from bokeh.transform import factor_cmap, linear_cmap
-from bokeh.layouts import column, row
+from bokeh.layouts import column, row, layout
 from bokeh.models import ColumnDataSource, Div, Legend, LegendItem, Range1d, Slider, MultiSelect, HoverTool, ColorBar
 from bokeh.palettes import BrBG6, Set1_5, HighContrast, Set1_6, Set1_7, Viridis256
 from bokeh.events import SelectionGeometry
@@ -52,16 +52,22 @@ data['Resort'] = data['Resort'].str.split('-').str[0]
 
 #styling
 colors = ['#55eb67', '#ffd439', '#19bbdc', '#c965ff', '#ff540a']
-width = '700px'
-style = {
+width = '900px'
+text_style = {
     'word-wrap': 'break-word',
     'width': width,
-    'font-size': '15px'
+    'font-size': '20px',
+    'margin-left': '42%'
 }
 
 #---------------------------------------------
 #           Graph 1 - avg prices
 #---------------------------------------------
+title_div = Div(text="""
+    <div style="font-size: 56px; font-weight: bold; color: #c2c2d6; text-align: center; margin-top: 10px; width: 100%; margin-left: 72%;">
+        Ski Resorts: A Frosty Analysis
+    </div>
+""")
 
 text = """Snowsports are a fantastic way to get outside and enjoy the beautiful winter weather. They're a great form of exercise, an enjoyable social activity, and
  a fun way to enjoy all that nature has to offer. Whether it's skiing, snowboarding, or some other form of downhill winter activity, there's always something to do 
@@ -73,7 +79,7 @@ lifts, no food, equipment, or accommodation included. Below is the average lift 
 
  
  """
-div0 = Div(text=text, styles=style)
+div0 = Div(text=text, styles=text_style)
 
 
 avg = data.groupby("Continent")["Price"].mean().reset_index()
@@ -86,6 +92,7 @@ basic_bar.vbar(x='Continent', top='Price', source=source, width=0.5, color=facto
 
 basic_bar.xgrid.grid_line_color = None
 basic_bar.y_range.start = 0
+basic_bar.styles = {'margin-left': '57%'}
 
 
 #---------------------------------------------
@@ -95,7 +102,7 @@ basic_bar.y_range.start = 0
 text = """However, prices are often deceptive and further extrapolation is needed to understand which deals that give you the best bang for your buck. Afterall, just because you bought
 an expensive lift ticket doesn't guarantee that you're getting better conditions or terrain, than a cheaper one. For example, if we take a popular metric for judging ski hills,
 total vertical elevation (highest run to lowest run) we can begin to understand the general trends of pricing schemes relative to the offering of the given mountains, across the world."""
-div1 = Div(text=text, styles=style)
+div1 = Div(text=text, styles=text_style)
 
 source = ColumnDataSource(data)
 
@@ -104,6 +111,8 @@ scatter = basic_scatter.scatter(x='Price', y='Height', source=source, size=8, al
 
 legend = Legend(items=[LegendItem(label=dict(field="Continent"), renderers=[scatter])])
 basic_scatter.add_layout(legend, 'right')
+
+basic_scatter.styles = {'margin-left': '57%'}
 
 #p.background_fill_color = '#181919'
 
@@ -116,7 +125,7 @@ And while not as numerous, the South American and Asian resorts appear to offer 
 The purpose of this brief example was to highlight the variability in skiing around the world, while pointing out the differences in what these mountains might provide.
 Everyone has their own vision of a perfect day on the hill, and the following tools are provided to further analyze data statistics on ski resorts and their offerings. Ultimately, this allows for a data driven
 comparison across a wide range of whatever factors you deem to be the most important to you in your skiing experience - applied immediately to a vast selection of some of the many mountains the world has to offer."""
-div2 = Div(text=text, styles=style)
+div2 = Div(text=text, styles=text_style)
 
 #---------------------------------------------
 #              Sliders + List
@@ -140,6 +149,18 @@ childFriendly_slider = Slider(title="Child friendly", start=0, end=2, step=1, va
 snowpark_slider = Slider(title="Snowparks", start=0, end=2, step=1, value=1)
 nightskiing_slider = Slider(title="Nightskiing", start=0, end=2, step=1, value=1)
 summerskiing_slider = Slider(title="Summer skiing", start=0, end=2, step=1, value=1)
+
+weight_div = Div(text="""
+    <div style="font-size: 15px; font-weight: bold; text-align: center; width: 100%; margin-top: 5%;">
+        Below are the weight sliders that allow you to indicate your prefered importance for each resort attribute
+    </div>
+""")
+
+slider_div = Div(text="""
+    <div style="font-size: 15px; font-weight: bold; text-align: center; width: 100%; margin-top: 5%;">
+        Below are the filter sliders that work on a scale of (0 - must not have, 1 - don't care 2 - must have)
+    </div>
+""")
 
 #---------------------------------------------
 #        Data Formatting + Normalizing
@@ -349,14 +370,14 @@ ski_map.on_event(SelectionGeometry, set_bs_flag)
 #               Layout and style
 #---------------------------------------------
 
-layout = column(div0, basic_bar, div1, basic_scatter, div2, country_select, row(price_slider, elevation_slider, totalRun_slider), 
-row(numberOfLifts_slider, longestRunLength_slider, snowCannonSlider), row(childFriendly_slider, snowpark_slider, nightskiing_slider, summerskiing_slider), ski_map, row(static_sbar))        
+main_layout = layout(column(title_div, div0, basic_bar, div1, basic_scatter, div2, row(country_select, column(weight_div, row(price_slider, elevation_slider, totalRun_slider), 
+row(numberOfLifts_slider, longestRunLength_slider, snowCannonSlider), slider_div, row(childFriendly_slider, snowpark_slider, nightskiing_slider, summerskiing_slider))), ski_map, row(static_sbar)))      
 #column(row(), row())          
 
 #output_file("viz.html")
 #show(layout)
 
-curdoc().add_root(layout)
+curdoc().add_root(main_layout)
 
 
 
