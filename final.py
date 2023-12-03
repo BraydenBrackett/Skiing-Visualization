@@ -11,7 +11,7 @@
 #  + Complete algorithm for calculating new ranking table
 #  + Begin work on new ranking table (decided against this and added more granularity to existing features)
 # Week 4:
-#   Finish new ranking table
+#  + Finish new ranking table
 # Week 5:
 #   Polish work and add any updates
 
@@ -19,6 +19,8 @@
 # TBD
 # - Add top 10 feature for maps?
 # - 3D globe?
+# - reset button causes some minor issues - if something is selected and you reset, it wont go back to og country selection
+# - auto sizing on bar chart is still a little weirds
 
 
 #Data Source: https://www.kaggle.com/datasets/ulrikthygepedersen/ski-resorts
@@ -175,14 +177,16 @@ def adjust_weights():
     for x in attributes:
         new_column = f'{x}_nrm'
         values = data[x].values.reshape(-1, 1)
-        normalized_values = scaler.fit_transform(values)
-        if new_column == 'Longest run_nrm':
-            normalized_values[normalized_values == 0.0] = 0.3
-            data[new_column] = normalized_values.flatten() * weights[new_column]
-        elif new_column != 'Avg snow cannons per run_nrm' and new_column != 'Price_nrm':
-            data[new_column] = normalized_values.flatten() * weights[new_column]
+
+        if new_column == 'Avg snow cannons per run_nrm' or new_column == 'Price_nrm':
+            normalized_values = scaler.fit_transform(values)
+            data[new_column] = (4 - normalized_values.flatten()) * weights[new_column]
         else:
-            data[new_column] = normalized_values.flatten() * (10 - weights[new_column])
+            normalized_values = scaler.fit_transform(values)
+            if new_column == 'Longest run_nrm':
+                normalized_values[normalized_values == 0.0] = 0.3
+            data[new_column] = normalized_values.flatten() * weights[new_column]
+
         data['Normalized_Score'] += data[new_column]
 
     data['Rank'] = data['Normalized_Score'].rank(ascending=False)
@@ -213,16 +217,27 @@ if (new_height < 300):
 static_sbar = figure(y_range=resorts, width=1200, height=new_height, title="", toolbar_location=None, tools="", margin=(0, 50, 0, 50), sizing_mode="fixed")
 
 static_sbar.hbar_stack(sequences, y='Resort', height=0.5, source=bar_source, color=Set1_6)
-legend = Legend(items=[(seq, [static_sbar.renderers[i]]) for i, seq in enumerate(sequences)], location=(100, 20), 
-                label_text_font_size='10pt', label_standoff=4)
-
+legend_items = [(seq.replace('_nrm', ''), [static_sbar.renderers[i]]) for i, seq in enumerate(sequences)]
+legend = Legend(items=legend_items, location=(100, 20), label_text_font_size='10pt', label_standoff=4)
 static_sbar.add_layout(legend, 'above')
 
 for r in static_sbar.renderers:
     layer = r.name
+    prefix = ""
+    postfix = ""
+
+    if layer == 'Price_nrm':
+        prefix = "$"
+    elif layer == 'Height_nrm':
+        postfix = " m"
+    elif layer == "Longest run_nrm":
+        postfix = " km"
+
+
     hover = HoverTool(tooltips=[
-        ("%s" % layer.replace('_nrm', ''), "@{%s}" % layer.replace('_nrm', ''))
+        (f"{layer.replace('_nrm', '')}", f"{prefix}@{{{layer.replace('_nrm', '')}}}{postfix}")
     ], renderers=[r])
+
     static_sbar.add_tools(hover)
 
 #---------------------------------------------
@@ -279,7 +294,7 @@ def update_rankings(attr, old, new):
     color_bar.color_mapper=color_mapper['transform']
 
     # updating the map + bar
-    if used_box_select == True:
+    if used_box_select == True and source.selected.indices != []:
             selected_indices = source.selected.indices
             
             selected_data = {key: source.data[key][selected_indices] for key in source.data}
@@ -312,6 +327,8 @@ def update_rankings(attr, old, new):
     new_height = 60*top_10.shape[0]
     if (new_height < 300):
         new_height = 300
+
+    
 
     static_sbar.height = new_height
     
