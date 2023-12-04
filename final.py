@@ -13,7 +13,7 @@
 # Week 4:
 #  + Finish new ranking table
 # Week 5:
-#   Polish work and add any updates
+#  + Polish work and add any updates
 
 
 # TBD
@@ -22,6 +22,11 @@
 # - reset button causes some minor issues - if something is selected and you reset, it wont go back to og country selection
 # - auto sizing on bar chart is still a little weirds
 
+
+# References:
+# - https://projects.fivethirtyeight.com/sumo/
+# - https://mathisonian.github.io/idyll/a-walk-on-the-idyll-side/
+# - https://coolors.co/
 
 #Data Source: https://www.kaggle.com/datasets/ulrikthygepedersen/ski-resorts
 
@@ -56,17 +61,18 @@ width = '900px'
 text_style = {
     'word-wrap': 'break-word',
     'width': width,
-    'font-size': '20px',
-    'margin-left': '42%'
+    'font-size': '18px',
+    'margin-left': '50px'
 }
 
 #---------------------------------------------
 #           Graph 1 - avg prices
 #---------------------------------------------
 title_div = Div(text="""
-    <div style="font-size: 56px; font-weight: bold; color: #c2c2d6; text-align: center; margin-top: 10px; width: 100%; margin-left: 72%;">
-        Ski Resorts: A Frosty Analysis
+    <div style="font-size: 64px; font-weight: bold; color: #607d8b; margin-top: 10px; width: 100%; margin-left: 42px;">
+        Ski Resorts
     </div>
+    <hr style="width: 500px; height: 3px; background-color: #607d8b; margin-left: 45px">
 """)
 
 text = """Snowsports are a fantastic way to get outside and enjoy the beautiful winter weather. They're a great form of exercise, an enjoyable social activity, and
@@ -86,13 +92,13 @@ avg = data.groupby("Continent")["Price"].mean().reset_index()
 
 source = ColumnDataSource(avg)
 
-basic_bar = figure(y_axis_label='Ticket Price (USD $)', x_range=avg['Continent'], height=350, toolbar_location=None, tools="")
+basic_bar = figure(y_axis_label='Ticket Price (USD $)', x_range=avg['Continent'], height=400, width=450, toolbar_location=None, tools="")
 
 basic_bar.vbar(x='Continent', top='Price', source=source, width=0.5, color=factor_cmap('Continent', palette=colors, factors=data['Continent'].unique()))
 
 basic_bar.xgrid.grid_line_color = None
 basic_bar.y_range.start = 0
-basic_bar.styles = {'margin-left': '57%'}
+basic_bar.styles = {'margin-left': '6.5%'}
 
 
 #---------------------------------------------
@@ -100,9 +106,16 @@ basic_bar.styles = {'margin-left': '57%'}
 #---------------------------------------------
 
 text = """However, prices are often deceptive and further extrapolation is needed to understand which deals that give you the best bang for your buck. Afterall, just because you bought
-an expensive lift ticket doesn't guarantee that you're getting better conditions or terrain, than a cheaper one. For example, if we take a popular metric for judging ski hills,
+an expensive lift ticket doesn't guarantee that you're getting better conditions or terrain than a cheaper one. For example, if we take a popular metric for judging ski hills,
 total vertical elevation (highest run to lowest run) we can begin to understand the general trends of pricing schemes relative to the offering of the given mountains, across the world."""
 div1 = Div(text=text, styles=text_style)
+div1.styles = {
+    'word-wrap': 'break-word',
+    'width': width,
+    'font-size': '18px',
+    'margin-left': '50px',
+    'margin-top' : '5%'
+}
 
 source = ColumnDataSource(data)
 
@@ -112,14 +125,13 @@ scatter = basic_scatter.scatter(x='Price', y='Height', source=source, size=8, al
 legend = Legend(items=[LegendItem(label=dict(field="Continent"), renderers=[scatter])])
 basic_scatter.add_layout(legend, 'right')
 
-basic_scatter.styles = {'margin-left': '57%'}
+basic_scatter.styles = {'margin-left': '5%', 'margin-top' : '3%'}
 
 #p.background_fill_color = '#181919'
 
 text = """Unsurprisingly, the North American resorts are substantially more expensive that all other continents. They also happen to have the most variability in ticket price. The
 European continent, with it's famed and historic ski resorts, interestingly has more terrain to offer at a substantially reduced price compared to the shorter North American Resorts.
 And while not as numerous, the South American and Asian resorts appear to offer cheaper deals than both the North American and European resorts, with a large amount of terrain provided for the low cost.
-<br>
 <br>
 <br>
 The purpose of this brief example was to highlight the variability in skiing around the world, while pointing out the differences in what these mountains might provide.
@@ -142,6 +154,7 @@ longestRunLength_slider = Slider(title="How important is run length", start=0, e
 numberOfLifts_slider = Slider(title="How important is the number of lifts", start=0, end=10, step=1, value=5) #total lifts column
 
 country_select = MultiSelect(title="Select Countries:", height=300, options=['All'] + sorted(list(set(data['Country']))), value=['All'])
+country_select.styles = {'margin-left': '15%'}
 
 #categorical sliders (must not have - don't care - must have)
 #TODO: have text explaining each of the numerical values here
@@ -152,13 +165,13 @@ summerskiing_slider = Slider(title="Summer skiing", start=0, end=2, step=1, valu
 
 weight_div = Div(text="""
     <div style="font-size: 15px; font-weight: bold; text-align: center; width: 100%; margin-top: 5%;">
-        Below are the weight sliders that allow you to indicate your prefered importance for each resort attribute
+        Indicate your prefered importance for each resort attribute
     </div>
 """)
 
 slider_div = Div(text="""
     <div style="font-size: 15px; font-weight: bold; text-align: center; width: 100%; margin-top: 5%;">
-        Below are the filter sliders that work on a scale of (0 - must not have, 1 - don't care 2 - must have)
+        Filter sliders on a scale of: (0 - must not have, 1 - don't care 2 - must have)
     </div>
 """)
 
@@ -222,6 +235,20 @@ source = ColumnDataSource(data) # main source of data
 #               Stacked Bars
 #---------------------------------------------
 
+instr_div = Div(text="""
+    <div style="font-size: 24px; font-weight: bold; color: #607d8b; margin-top: 10px; width: 100%; margin-left: 42px;">
+        Explore the data
+    </div>
+    <hr style="width: 500px; height: 3px; background-color: #607d8b; margin-left: 45px">
+""")
+
+list_div = Div(text="""
+    <div style="font-size: 24px; font-weight: bold; color: #607d8b; margin-top: 10px; width: 100%; margin-left: 42px;">
+        Weighted rank
+    </div>
+    <hr style="width: 500px; height: 3px; background-color: #607d8b; margin-left: 45px">
+""")
+
 #top_10 = data.nlargest(10, 'Normalized_Score').sort_values(by='Normalized_Score', ascending=True)
 top_10 = data.sort_values(by='Normalized_Score', ascending=True)
 resorts = top_10['Resort'].tolist()
@@ -239,7 +266,7 @@ static_sbar = figure(y_range=resorts, width=1200, height=new_height, title="", t
 
 static_sbar.hbar_stack(sequences, y='Resort', height=0.5, source=bar_source, color=Set1_6)
 legend_items = [(seq.replace('_nrm', ''), [static_sbar.renderers[i]]) for i, seq in enumerate(sequences)]
-legend = Legend(items=legend_items, location=(100, 20), label_text_font_size='10pt', label_standoff=4)
+legend = Legend(items=legend_items, location=(100, 20), label_text_font_size='10pt', label_standoff=4, orientation='horizontal')
 static_sbar.add_layout(legend, 'above')
 
 for r in static_sbar.renderers:
@@ -254,19 +281,20 @@ for r in static_sbar.renderers:
     elif layer == "Longest run_nrm":
         postfix = " km"
 
-
     hover = HoverTool(tooltips=[
         (f"{layer.replace('_nrm', '')}", f"{prefix}@{{{layer.replace('_nrm', '')}}}{postfix}")
     ], renderers=[r])
 
     static_sbar.add_tools(hover)
 
+static_sbar.styles = {'margin-top': '1%'}
+
 #---------------------------------------------
 #                   Map
 #---------------------------------------------
 
 TOOLS = "reset,pan,wheel_zoom,box_select"
-ski_map = figure(width=1200, height=600, x_range=Range1d(start=x_range_min + 100000, end=x_range_max - 100000, bounds=(x_range_min, x_range_max)), 
+ski_map = figure(width=1600, height=800, x_range=Range1d(start=x_range_min + 100000, end=x_range_max - 100000, bounds=(x_range_min, x_range_max)), 
             y_range=Range1d(start=y_range_min + 100000, end=y_range_max - 100000, bounds=(y_range_min, y_range_max)),
            x_axis_type="mercator", y_axis_type="mercator", tools=TOOLS)
 ski_map.add_tile("CartoDB Positron", retina=True)
@@ -286,6 +314,8 @@ hover_tool_nodes = HoverTool(renderers=[s], tooltips= [
         ("Avg Snow Cannons per Run", "@{Avg snow cannons per run}")
 ])
 ski_map.add_tools(hover_tool_nodes)
+
+ski_map.styles = {'margin-left': '10%', 'margin-top': '3%'}
 
 #---------------------------------------------
 #            Update + Handlers
@@ -370,14 +400,14 @@ ski_map.on_event(SelectionGeometry, set_bs_flag)
 #               Layout and style
 #---------------------------------------------
 
-main_layout = layout(column(title_div, div0, basic_bar, div1, basic_scatter, div2, row(country_select, column(weight_div, row(price_slider, elevation_slider, totalRun_slider), 
-row(numberOfLifts_slider, longestRunLength_slider, snowCannonSlider), slider_div, row(childFriendly_slider, snowpark_slider, nightskiing_slider, summerskiing_slider))), ski_map, row(static_sbar)))      
-#column(row(), row())          
+#main_layout = layout(column(title_div, div0, basic_bar, div1, basic_scatter, div2, row(country_select, column(weight_div, row(price_slider, elevation_slider, totalRun_slider), 
+#row(numberOfLifts_slider, longestRunLength_slider, snowCannonSlider), slider_div, row(childFriendly_slider, snowpark_slider, nightskiing_slider, summerskiing_slider))), ski_map, row(static_sbar)))
 
-#output_file("viz.html")
-#show(layout)
+main_layout = layout(column(title_div, row(div0, basic_bar), row(column(div1, div2), basic_scatter), instr_div, row(country_select, column(weight_div, row(price_slider, elevation_slider, totalRun_slider), 
+row(numberOfLifts_slider, longestRunLength_slider, snowCannonSlider), slider_div, row(childFriendly_slider, snowpark_slider, nightskiing_slider, summerskiing_slider))), ski_map, list_div,row(static_sbar)))      
 
 curdoc().add_root(main_layout)
+
 
 
 
