@@ -15,12 +15,14 @@
 # Week 5:
 #  + Polish work and add any updates
 
-
 # TBD
 # - Add top 10 feature for maps?
 # - 3D globe?
+
+# Known Issues:
 # - reset button causes some minor issues - if something is selected and you reset, it wont go back to og country selection
-# - auto sizing on bar chart is still a little weirds
+# - auto sizing on bar chart is off, postional issues as well
+# - soruce data contains some inaccuracies for larger grouped resorts (ex. les 3 vallees)
 
 
 # References:
@@ -28,14 +30,14 @@
 # - https://mathisonian.github.io/idyll/a-walk-on-the-idyll-side/
 # - https://coolors.co/
 
-#Data Source: https://www.kaggle.com/datasets/ulrikthygepedersen/ski-resorts
+# Data Source: https://www.kaggle.com/datasets/ulrikthygepedersen/ski-resorts
 
 
 from bokeh.plotting import figure, curdoc
 from bokeh.transform import factor_cmap, linear_cmap
 from bokeh.layouts import column, row, layout
 from bokeh.models import ColumnDataSource, Div, Legend, LegendItem, Range1d, Slider, MultiSelect, HoverTool, ColorBar
-from bokeh.palettes import BrBG6, Set1_5, HighContrast, Set1_6, Set1_7, Viridis256
+from bokeh.palettes import BrBG6, Set1_5, HighContrast, Set1_6, Viridis256, Spectral6, Colorblind6
 from bokeh.events import SelectionGeometry
 from sklearn.preprocessing import MinMaxScaler
 import pandas as pd
@@ -44,6 +46,8 @@ import numpy as np
 
 data = pd.read_csv(sys.argv[1], encoding='latin-1')
 
+#NOTE: several issues with data that had to be addressed and cleaned below - not perfect but gets the job done
+
 #data cleanup
 for x in data.columns:
     if data[x].dtype == 'O':
@@ -51,12 +55,15 @@ for x in data.columns:
 
 data['Height'] = data['Highest point'] - data['Lowest point']
 data = data[data['Price'] != 0]
-data['Longest run'] = data['Longest run'].apply(lambda x: 1 if x == 0 else x) # to deal with future plotting issues as 0 repersets less than 1 km here
+data['Longest run'] = data['Longest run'].apply(lambda x: 2 if x == 0 else x) # to deal with future plotting issues as 0 repersets less than 1 km here
 data = data[~data['Resort'].str.contains('/')] # removing rows where it's an aggregate of resorts
+data = data[(data['Height'] <= 1000) | (data['Longest run'] != 1)]
+data = data[~data['Resort'].str.contains('Belleville|Menuires|Thorens|Meribel|Gets|Chatel|Thyon|Nendaz|Verbier', case=False, na=False)] # data wasn't sourced properly
 data['Resort'] = data['Resort'].str.split('-').str[0]
 
 #styling
 colors = ['#55eb67', '#ffd439', '#19bbdc', '#c965ff', '#ff540a']
+bar_colors = list(Set1_6)[:5] + ["#FFD700"]
 width = '900px'
 text_style = {
     'word-wrap': 'break-word',
@@ -64,7 +71,6 @@ text_style = {
     'font-size': '18px',
     'margin-left': '50px'
 }
-
 #---------------------------------------------
 #           Graph 1 - avg prices
 #---------------------------------------------
@@ -157,7 +163,6 @@ country_select = MultiSelect(title="Select Countries:", height=300, options=['Al
 country_select.styles = {'margin-left': '15%'}
 
 #categorical sliders (must not have - don't care - must have)
-#TODO: have text explaining each of the numerical values here
 childFriendly_slider = Slider(title="Child friendly", start=0, end=2, step=1, value=1)
 snowpark_slider = Slider(title="Snowparks", start=0, end=2, step=1, value=1)
 nightskiing_slider = Slider(title="Nightskiing", start=0, end=2, step=1, value=1)
@@ -189,6 +194,7 @@ y_range_min = data['Latitude'].min() - 2000000
 y_range_max = data['Latitude'].max() + 2000000
 
 data['Avg snow cannons per run'] = data['Snow cannons'] / data['Total slopes']
+
 # resets rankings
 def adjust_weights():
     
@@ -249,7 +255,6 @@ list_div = Div(text="""
     <hr style="width: 500px; height: 3px; background-color: #607d8b; margin-left: 45px">
 """)
 
-#top_10 = data.nlargest(10, 'Normalized_Score').sort_values(by='Normalized_Score', ascending=True)
 top_10 = data.sort_values(by='Normalized_Score', ascending=True)
 resorts = top_10['Resort'].tolist()
 sequences = ['Price_nrm', 'Height_nrm', 'Total slopes_nrm', 'Total lifts_nrm', 'Longest run_nrm', 'Avg snow cannons per run_nrm']
@@ -257,14 +262,13 @@ top_10 = top_10[['Resort', 'Price', 'Height', 'Total slopes', 'Total lifts', 'Lo
                 'Total slopes_nrm', 'Total lifts_nrm', 'Longest run_nrm', 'Avg snow cannons per run_nrm']].copy()
 bar_source = ColumnDataSource(data=top_10)
 
-#height was 600
 new_height = 60*top_10.shape[0]
 if (new_height < 300):
     new_height = 300
 
 static_sbar = figure(y_range=resorts, width=1200, height=new_height, title="", toolbar_location=None, tools="", margin=(0, 50, 0, 50), sizing_mode="fixed")
 
-static_sbar.hbar_stack(sequences, y='Resort', height=0.5, source=bar_source, color=Set1_6)
+static_sbar.hbar_stack(sequences, y='Resort', height=0.5, source=bar_source, color=Colorblind6)
 legend_items = [(seq.replace('_nrm', ''), [static_sbar.renderers[i]]) for i, seq in enumerate(sequences)]
 legend = Legend(items=legend_items, location=(100, 20), label_text_font_size='10pt', label_standoff=4, orientation='horizontal')
 static_sbar.add_layout(legend, 'above')
@@ -341,15 +345,14 @@ def update_rankings(attr, old, new):
     adjust_weights()
     color_mapper = linear_cmap(field_name='Rank', palette=Viridis256, low=max(data['Rank']), high=min(data['Rank']))
     s.glyph.fill_color = color_mapper
-    #s.glyph.line_color = color_mapper
     color_bar.color_mapper=color_mapper['transform']
 
     # updating the map + bar
     if used_box_select == True and source.selected.indices != []:
-            selected_indices = source.selected.indices
-            
-            selected_data = {key: source.data[key][selected_indices] for key in source.data}
-            map_filter_data = pd.DataFrame(selected_data)
+        selected_indices = source.selected.indices
+        
+        selected_indices = source.selected.indices
+        map_filter_data = data.iloc[selected_indices]
     else:
         source.selected.indices = []
         if country_select.value == ['All']:
@@ -367,7 +370,6 @@ def update_rankings(attr, old, new):
             map_filter_data = map_filter_data[map_filter_data[column_name] == 'Yes']
             
 
-    #top_10 = map_filter_data.nlargest(10, 'Normalized_Score').sort_values(by='Normalized_Score', ascending=True)
     top_10 = map_filter_data.sort_values(by='Normalized_Score', ascending=True)
     resorts = top_10['Resort'].tolist()
     top_10 = top_10[['Resort', 'Price', 'Height', 'Total slopes', 'Total lifts', 'Longest run', 'Avg snow cannons per run', 'Price_nrm', 'Height_nrm',
@@ -378,8 +380,6 @@ def update_rankings(attr, old, new):
     new_height = 60*top_10.shape[0]
     if (new_height < 300):
         new_height = 300
-
-    
 
     static_sbar.height = new_height
     
@@ -400,32 +400,7 @@ ski_map.on_event(SelectionGeometry, set_bs_flag)
 #               Layout and style
 #---------------------------------------------
 
-#main_layout = layout(column(title_div, div0, basic_bar, div1, basic_scatter, div2, row(country_select, column(weight_div, row(price_slider, elevation_slider, totalRun_slider), 
-#row(numberOfLifts_slider, longestRunLength_slider, snowCannonSlider), slider_div, row(childFriendly_slider, snowpark_slider, nightskiing_slider, summerskiing_slider))), ski_map, row(static_sbar)))
-
 main_layout = layout(column(title_div, row(div0, basic_bar), row(column(div1, div2), basic_scatter), instr_div, row(country_select, column(weight_div, row(price_slider, elevation_slider, totalRun_slider), 
 row(numberOfLifts_slider, longestRunLength_slider, snowCannonSlider), slider_div, row(childFriendly_slider, snowpark_slider, nightskiing_slider, summerskiing_slider))), ski_map, list_div,row(static_sbar)))      
 
 curdoc().add_root(main_layout)
-
-
-
-
-#LEFTOVER CODE:
-
-#for countries
-#country_select = CheckboxGroup(labels=sorted(list(set(data['Country']))), active=[])
-
-#def checkbox_handler(active):
-    #print(f'Active checkboxes: {active}')
-
-#country_select.on_change('active', lambda attr, old, new: checkbox_handler(new))
-
-#other_items = ['Child Friendly', 'Snowpark', 'Europe', 'Asia', 'Oceania']
-#continent_select = CheckboxGroup(labels=continents, active=[])
-
-#def checkbox_handler(active):
-    #TODO: Add continent sorting here
-    #print(f'Active checkboxes: {active}')
-
-#continent_select.on_change('active', lambda attr, old, new: checkbox_handler(new))

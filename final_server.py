@@ -1,6 +1,6 @@
-import sys
 import subprocess
 import os
+import sys
 
 # You will need to use ctrl+c to close the program
 
