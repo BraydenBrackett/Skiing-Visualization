@@ -1,4 +1,4 @@
-#TODO:
+# Progress:
 # Week 1:
 #  + Clean data
 #  + Begin creation of main project webpage/figure out how to display it in a better fashion that a python command script
@@ -15,15 +15,10 @@
 # Week 5:
 #  + Polish work and add any updates
 
-# TBD
-# - Add top 10 feature for maps?
-# - 3D globe?
-
 # Known Issues:
 # - reset button causes some minor issues - if something is selected and you reset, it wont go back to og country selection
 # - auto sizing on bar chart is off, postional issues as well
 # - soruce data contains some inaccuracies for larger grouped resorts (ex. les 3 vallees)
-
 
 # References:
 # - https://projects.fivethirtyeight.com/sumo/
@@ -32,12 +27,11 @@
 
 # Data Source: https://www.kaggle.com/datasets/ulrikthygepedersen/ski-resorts
 
-
 from bokeh.plotting import figure, curdoc
 from bokeh.transform import factor_cmap, linear_cmap
 from bokeh.layouts import column, row, layout
 from bokeh.models import ColumnDataSource, Div, Legend, LegendItem, Range1d, Slider, MultiSelect, HoverTool, ColorBar
-from bokeh.palettes import BrBG6, Set1_5, HighContrast, Set1_6, Viridis256, Spectral6, Colorblind6
+from bokeh.palettes import Set1_5, Set1_6, Viridis256, Colorblind6
 from bokeh.events import SelectionGeometry
 from sklearn.preprocessing import MinMaxScaler
 import pandas as pd
@@ -46,7 +40,7 @@ import numpy as np
 
 data = pd.read_csv(sys.argv[1], encoding='latin-1')
 
-#NOTE: several issues with data that had to be addressed and cleaned below - not perfect but gets the job done
+#NOTE: several issues with data had to be addressed and cleaned below - not perfect but gets the job done
 
 #data cleanup
 for x in data.columns:
@@ -87,7 +81,7 @@ text = """Snowsports are a fantastic way to get outside and enjoy the beautiful 
  you and your family and friends' needs can be a challenging task - not to mention an expensive one.
 <br><br>
 From a high-level perspective, a day's worth of skiing can range from the price of sit down meal to over $100 - all this for a day ticket that just gets you on the 
-lifts, no food, equipment, or accommodation included. Below is the average lift ticket price (in USD) across ski hills spanning each continent for the 2022 season.
+lifts, no food, equipment, or accommodation included. Below is the average daily lift ticket price (in USD) across ski hills spanning each continent for the 2022 season.
 
  
  """
@@ -111,7 +105,7 @@ basic_bar.styles = {'margin-left': '6.5%'}
 #      Graph 2 - prices across terrian
 #---------------------------------------------
 
-text = """However, prices are often deceptive and further extrapolation is needed to understand which deals that give you the best bang for your buck. Afterall, just because you bought
+text = """Yet, prices are often deceptive and further extrapolation is needed to understand which deals give you the best bang for your buck. Afterall, just because you bought
 an expensive lift ticket doesn't guarantee that you're getting better conditions or terrain than a cheaper one. For example, if we take a popular metric for judging ski hills,
 total vertical elevation (highest run to lowest run) we can begin to understand the general trends of pricing schemes relative to the offering of the given mountains, across the world."""
 div1 = Div(text=text, styles=text_style)
@@ -135,14 +129,14 @@ basic_scatter.styles = {'margin-left': '5%', 'margin-top' : '3%'}
 
 #p.background_fill_color = '#181919'
 
-text = """Unsurprisingly, the North American resorts are substantially more expensive that all other continents. They also happen to have the most variability in ticket price. The
-European continent, with it's famed and historic ski resorts, interestingly has more terrain to offer at a substantially reduced price compared to the shorter North American Resorts.
+text = """Unsurprisingly, the North American resorts are substantially more expensive than all other continents. They also happen to have the most variability in ticket price. The
+European continent, with it's famed and historic ski resorts, interestingly has more terrain to offer at a substantially reduced price compared to the shorter North American resorts.
 And while not as numerous, the South American and Asian resorts appear to offer cheaper deals than both the North American and European resorts, with a large amount of terrain provided for the low cost.
 <br>
 <br>
 The purpose of this brief example was to highlight the variability in skiing around the world, while pointing out the differences in what these mountains might provide.
 Everyone has their own vision of a perfect day on the hill, and the following tools are provided to further analyze data statistics on ski resorts and their offerings. Ultimately, this allows for a data driven
-comparison across a wide range of whatever factors you deem to be the most important to you in your skiing experience - applied immediately to a vast selection of some of the many mountains the world has to offer."""
+comparison across a wide range of factors (day ticket price, total vertical, total number of runs, total number of lifts, run length, the type of snow, and a few other filtering factors) where you can choose which are the most important to you for your skiing experience - applied immediately to a vast selection of some of the many mountains the world has to offer."""
 div2 = Div(text=text, styles=text_style)
 
 #---------------------------------------------
@@ -176,7 +170,7 @@ weight_div = Div(text="""
 
 slider_div = Div(text="""
     <div style="font-size: 15px; font-weight: bold; text-align: center; width: 100%; margin-top: 5%;">
-        Filter sliders on a scale of: (0 - must not have, 1 - don't care 2 - must have)
+        Filter sliders on a scale of: (0 - must not have, 1 - don't care, 2 - must have)
     </div>
 """)
 
